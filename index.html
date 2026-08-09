@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>MyStudentSelector</title>
+<meta name="description" content="Randomly pick students from your class rosters for cold calling." />
+
+<!-- PWA / iOS home screen -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#4f46e5" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="StudentPick" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-192.png" />
+
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===================== ROSTER LIST VIEW ===================== -->
+  <section id="view-rosters" class="view" data-view="rosters">
+    <header class="topbar">
+      <h1 class="app-title">
+        <span class="die-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20"><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor"/><circle cx="7.5" cy="7.5" r="1.6" fill="var(--bg)"/><circle cx="16.5" cy="7.5" r="1.6" fill="var(--bg)"/><circle cx="12" cy="12" r="1.6" fill="var(--bg)"/><circle cx="7.5" cy="16.5" r="1.6" fill="var(--bg)"/><circle cx="16.5" cy="16.5" r="1.6" fill="var(--bg)"/></svg>
+        </span>
+        MyStudentSelector
+      </h1>
+    </header>
+
+    <main class="content">
+      <div id="roster-empty" class="empty-state" hidden>
+        <div class="empty-icon">🎲</div>
+        <h2>No class lists yet</h2>
+        <p>Create a roster to start randomly calling on students.</p>
+        <button class="btn btn-primary" id="empty-add-roster-btn">Create your first class</button>
+      </div>
+
+      <ul id="roster-list" class="roster-list"></ul>
+    </main>
+
+    <button id="add-roster-fab" class="fab" aria-label="Add class">
+      <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+    </button>
+  </section>
+
+  <!-- ===================== ROSTER DETAIL / PICKER VIEW ===================== -->
+  <section id="view-roster" class="view" data-view="roster" hidden>
+    <header class="topbar">
+      <button class="icon-btn back-btn" id="back-btn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M15.5 4.5 8 12l7.5 7.5 1.4-1.4L10.8 12l6.1-6.1z"/></svg>
+      </button>
+      <h1 class="app-title roster-title" id="roster-title">Class</h1>
+      <button class="icon-btn" id="roster-menu-btn" aria-label="Class options">
+        <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>
+      </button>
+    </header>
+
+    <main class="content">
+      <div class="picker-card">
+        <div class="picker-progress" id="picker-progress">0 of 0 called this round</div>
+        <div class="picker-stage" id="picker-stage">
+          <div class="picker-placeholder" id="picker-placeholder">Tap the button to pick a student</div>
+          <div class="picker-name" id="picker-name" hidden></div>
+        </div>
+        <button class="btn btn-primary btn-pick" id="pick-btn">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="currentColor" opacity=".001"/><path fill="currentColor" d="M12 2 2 7l10 5 10-5-10-5Zm0 7.2L4.3 6 12 2.8 19.7 6 12 9.2ZM2 17l10 5 10-5v-2l-10 5-10-5v2Zm0-5 10 5 10-5v-2l-10 5-10-5v2Z"/></svg>
+          Pick a Student
+        </button>
+        <button class="btn btn-ghost btn-reset-round" id="reset-round-btn" hidden>Start a new round</button>
+      </div>
+
+      <div class="section-row">
+        <h2 class="section-title">Roster</h2>
+        <button class="link-btn" id="add-students-btn">Add students</button>
+      </div>
+
+      <div id="students-empty" class="empty-state" hidden>
+        <div class="empty-icon">🧑‍🎓</div>
+        <h2>No students yet</h2>
+        <p>Add names one at a time, or paste a whole list.</p>
+        <button class="btn btn-primary" id="empty-add-students-btn">Add students</button>
+      </div>
+
+      <ul id="student-list" class="student-list"></ul>
+    </main>
+  </section>
+
+</div>
+
+<!-- ===================== MODAL: Add / Rename Roster ===================== -->
+<div class="modal-backdrop" id="roster-modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="roster-modal-title">
+    <h2 id="roster-modal-title">New class</h2>
+    <input type="text" id="roster-name-input" class="text-input" placeholder="e.g. Period 3 — Chemistry" maxlength="60" autocomplete="off" />
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="roster-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="roster-modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: Add Students ===================== -->
+<div class="modal-backdrop" id="students-modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="students-modal-title">
+    <h2 id="students-modal-title">Add students</h2>
+    <input type="text" id="single-student-input" class="text-input" placeholder="Add one name…" autocomplete="off" />
+    <p class="modal-hint">Or paste a list — one name per line or separated by commas.</p>
+    <textarea id="bulk-student-input" class="textarea-input" rows="5" placeholder="Alex Kim&#10;Jordan Lee&#10;Sam Patel"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="students-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="students-modal-save">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SHEET: Roster options ===================== -->
+<div class="modal-backdrop" id="roster-sheet-backdrop" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <button class="sheet-action" id="sheet-rename">Rename class</button>
+    <button class="sheet-action" id="sheet-reset-round">Start a new round</button>
+    <button class="sheet-action" id="sheet-reset-stats">Reset call counts</button>
+    <button class="sheet-action danger" id="sheet-delete">Delete class</button>
+    <button class="sheet-action cancel" id="sheet-cancel">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
