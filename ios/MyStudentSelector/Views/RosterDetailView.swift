@@ -69,6 +69,8 @@ struct RosterDetailView: View {
                     Text("Roster")
                     Spacer()
                     Button("Add students") { showAddStudents = true }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.brandIndigo)
                         .font(.subheadline.weight(.semibold))
                 }
                 .textCase(nil)
@@ -166,16 +168,19 @@ struct RosterDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
             }
+            .buttonStyle(.plain)
             .background(LinearGradient.brand)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .opacity(isPicking ? 0.7 : 1)
-            .disabled(isPicking)
+            .opacity(isPicking || roster.presentStudents.isEmpty ? 0.5 : 1)
+            .disabled(isPicking || roster.presentStudents.isEmpty)
+            .contentShape(Rectangle())
 
             if roster.calledThisRoundCount > 0 {
                 Button("Start a new round") {
                     startNewRound(roster)
                 }
+                .buttonStyle(.plain)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             }
