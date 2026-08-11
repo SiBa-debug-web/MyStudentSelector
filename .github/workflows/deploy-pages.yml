@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - claude/iphone-cold-calling-app-i87f6m
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # A Pages site is publicly reachable even when the repository is
+      # private, so publish only the two web apps — never the Swift
+      # sources, Xcode project or anything else in the repo.
+      - name: Stage site
+        run: |
+          set -euo pipefail
+          mkdir -p _site/convo-notes
+
+          # MyStudentSelector lives at the site root
+          cp index.html styles.css app.js manifest.json sw.js _site/
+          cp -r icons _site/icons
+
+          # Convo Notes lives at /convo-notes/
+          cp convo-notes/web/index.html \
+             convo-notes/web/styles.css \
+             convo-notes/web/app.js \
+             convo-notes/web/manifest.json \
+             convo-notes/web/sw.js _site/convo-notes/
+          cp -r convo-notes/web/icons _site/convo-notes/icons
+
+          echo "Staged files:"
+          find _site -type f | sort
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
