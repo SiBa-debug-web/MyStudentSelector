@@ -23,24 +23,24 @@ There are two builds of the same app in this folder:
 - **Follow-up reminders** — anyone with no conversation for 30 days is flagged. The native app also fires a local notification and sets an app-icon badge.
 - **Everything stays on the device** — no accounts, no server, no network calls
 
+## The native app — start here
+
+This is the primary build. See [`ios/README.md`](ios/README.md) for how to open and run it in Xcode.
+
 ## The web app
 
-Live at **https://siba-debug-web.github.io/MyStudentSelector/convo-notes/web/**
-
-On an iPhone or iPad, open that link in **Safari**, tap the Share icon, then **Add to Home Screen**. It then runs full-screen like a native app and works offline.
-
-To run it locally instead:
+Not hosted anywhere — it's kept in the repo as a quick way to try the app without Xcode. Run it locally:
 
 ```
 cd convo-notes/web
 python3 -m http.server 8000
 ```
 
-Data lives in the browser's `localStorage`, so it is per-device and per-browser.
+then open `http://localhost:8000` in a browser.
 
-## The native app
+If you ever do want it on a phone, host the `web/` folder on any static host over HTTPS (GitHub Pages, Netlify, Cloudflare Pages), open the URL in Safari, and tap Share → **Add to Home Screen**.
 
-See [`ios/README.md`](ios/README.md) for how to open and run it in Xcode.
+Data lives in the browser's `localStorage`, so it is per-device and per-browser, and entirely separate from the native app's data.
 
 ## Follow-up timing
 

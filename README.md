@@ -1,39 +1,35 @@
 # MyStudentSelector
 
-A mobile web app for randomly picking students from a class list for cold calling — installs to an iPhone home screen like a native app, works offline, and needs no App Store or Mac/Xcode.
+This repo holds two small iOS apps. Each one exists as a native SwiftUI app (the primary build) and as a plain web app you can run locally without Xcode.
 
-## Features
+| App | Native | Web | What it does |
+|---|---|---|---|
+| **MyStudentSelector** | [`ios/`](ios) | repo root | Randomly picks a student from a class list for cold calling |
+| **Convo Notes** | [`convo-notes/ios/`](convo-notes/ios) | [`convo-notes/web/`](convo-notes/web) | Logs conversations with people and nudges you to follow up |
+
+Neither app is hosted on the web. Build the native apps in Xcode, or run a web version locally with `python3 -m http.server`.
+
+---
+
+## MyStudentSelector
+
+Picks a student at random for cold calling, without repeating anyone until the whole class has been called.
 
 - Multiple class rosters, each with its own student list
-- Random picker that won't repeat a student until everyone in the class has been called, then automatically starts a new round
+- No-repeat picker that auto-starts a new round once everyone has been called
 - Mark students absent to exclude them from picks without deleting them
-- Per-student call counts and "called this round" indicator
+- Per-student call counts and a "called this round" indicator
 - Add students one at a time or paste a whole list (comma- or newline-separated)
-- All data stored locally on-device (localStorage) — nothing leaves the phone
-- Installable as a standalone app via Safari's "Add to Home Screen," with offline support via a service worker
+- All data stored on-device — nothing leaves the phone
 
-## Installing on an iPhone
+**Native:** open `ios/MyStudentSelector.xcodeproj` in Xcode — see [`ios/README.md`](ios/README.md).
 
-1. Host the contents of this folder somewhere reachable over HTTPS (GitHub Pages, Netlify, Vercel, etc. all work with static files).
-2. Open the URL in Safari on the iPhone.
-3. Tap the Share icon, then **Add to Home Screen**.
-4. Launch it from the home screen — it opens full-screen, like a native app.
+**Web:** serve the repo root (`python3 -m http.server 8000`) and open `http://localhost:8000`. Files are `index.html`, `styles.css`, `app.js`, plus `manifest.json` / `sw.js` for offline support and `icons/`.
 
-## Local development
+---
 
-No build step. Serve the folder with any static file server, e.g.:
+## Convo Notes
 
-```
-python3 -m http.server 8000
-```
+Records notes on conversations with people — date stamped, location tagged, filterable by suburb — and flags anyone you haven't followed up with in a month. The native build also fires a local notification when a follow-up falls due.
 
-Then open `http://localhost:8000` in a browser.
-
-## Files
-
-- `index.html` — app markup
-- `styles.css` — styling (dark/light aware, iPhone safe-area aware)
-- `app.js` — app logic (roster/student CRUD, picker, persistence)
-- `manifest.json` — PWA manifest
-- `sw.js` — service worker for offline caching
-- `icons/` — app icons
+See [`convo-notes/README.md`](convo-notes/README.md) for the full write-up.
