@@ -2,7 +2,7 @@
 // install a fresh worker, purge the previous cache in `activate`, and take
 // over immediately — so an installed home-screen copy picks the update up on
 // its next launch instead of serving stale files indefinitely.
-const CACHE_NAME = "convonotes-cache-v2";
+const CACHE_NAME = "convonotes-cache-v3";
 const ASSETS = [
   "./",
   "./index.html",

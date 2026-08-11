@@ -548,6 +548,216 @@
     }
   }
 
+  // ------------------------------------------------------- backup: export
+  function backupFilename() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `convo-notes-backup-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.json`;
+  }
+
+  async function exportBackup() {
+    const payload = {
+      app: "convo-notes",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      people,
+    };
+    const text = JSON.stringify(payload, null, 2);
+    const filename = backupFilename();
+
+    // On iOS this opens the share sheet, so the file can go straight to
+    // Files, iCloud Drive or AirDrop. Everywhere else we fall back to a
+    // plain download.
+    try {
+      const file = new File([text], filename, { type: "application/json" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Convo Notes backup" });
+        return;
+      }
+    } catch (e) {
+      // User dismissed the share sheet — don't then force a download at them.
+      if (e && e.name === "AbortError") return;
+    }
+
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("Backup saved");
+  }
+
+  // ------------------------------------------------------- backup: import
+  /** Parsed-and-cleaned people waiting for the user to pick merge or replace. */
+  let pendingImport = null;
+
+  function isValidDate(value) {
+    if (typeof value !== "string" && typeof value !== "number") return false;
+    return !isNaN(new Date(value).getTime());
+  }
+
+  /**
+   * Accepts either a full backup object or a bare array of people, and
+   * repairs anything missing so a partial or hand-edited file still loads.
+   * Returns null when the file clearly isn't a backup.
+   */
+  function normalizeBackup(raw) {
+    const list = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object" && Array.isArray(raw.people)
+      ? raw.people
+      : null;
+    if (!list) return null;
+
+    const cleaned = [];
+    let skipped = 0;
+
+    for (const p of list) {
+      if (!p || typeof p !== "object" || typeof p.name !== "string" || !p.name.trim()) {
+        skipped++;
+        continue;
+      }
+      const rawConvos = Array.isArray(p.conversations) ? p.conversations : [];
+      cleaned.push({
+        id: typeof p.id === "string" && p.id ? p.id : uid(),
+        name: p.name.trim(),
+        category: ["man", "woman", "child"].includes(p.category) ? p.category : "man",
+        suburb: typeof p.suburb === "string" ? p.suburb.trim() : "",
+        shortlisted: !!p.shortlisted,
+        archived: !!p.archived,
+        createdAt: isValidDate(p.createdAt)
+          ? new Date(p.createdAt).toISOString()
+          : new Date().toISOString(),
+        conversations: rawConvos
+          .filter((c) => c && typeof c === "object" && isValidDate(c.at))
+          .map((c) => ({
+            id: typeof c.id === "string" && c.id ? c.id : uid(),
+            at: new Date(c.at).toISOString(),
+            kind: c.kind === "initial" ? "initial" : "followup",
+            location: typeof c.location === "string" ? c.location : "",
+            notes: typeof c.notes === "string" ? c.notes : "",
+          })),
+      });
+    }
+
+    return {
+      people: cleaned,
+      skipped,
+      exportedAt: raw && typeof raw === "object" ? raw.exportedAt : null,
+    };
+  }
+
+  function handleImportFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => toast("Couldn't read that file");
+    reader.onload = () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(String(reader.result));
+      } catch (e) {
+        toast("That file isn't a valid backup");
+        return;
+      }
+      const result = normalizeBackup(parsed);
+      if (!result) {
+        toast("That file isn't a Convo Notes backup");
+        return;
+      }
+      if (result.people.length === 0) {
+        toast("That backup has no people in it");
+        return;
+      }
+      pendingImport = result;
+      openImportModal(result);
+    };
+    reader.readAsText(file);
+  }
+
+  function openImportModal(result) {
+    const convoCount = result.people.reduce((sum, p) => sum + p.conversations.length, 0);
+    const parts = [
+      `${result.people.length} ${result.people.length === 1 ? "person" : "people"}`,
+      `${convoCount} conversation${convoCount === 1 ? "" : "s"}`,
+    ];
+    let summary = `This backup holds ${parts.join(" and ")}.`;
+    if (result.exportedAt && isValidDate(result.exportedAt)) {
+      summary += ` Saved ${formatDateTime(result.exportedAt)}.`;
+    }
+    if (result.skipped > 0) {
+      summary += ` ${result.skipped} unreadable ${result.skipped === 1 ? "entry" : "entries"} will be ignored.`;
+    }
+    document.getElementById("import-summary").textContent = summary;
+    document.getElementById("import-modal-backdrop").hidden = false;
+  }
+
+  function closeImportModal() {
+    document.getElementById("import-modal-backdrop").hidden = true;
+    pendingImport = null;
+    document.getElementById("import-file-input").value = "";
+  }
+
+  function applyImport(mode) {
+    if (!pendingImport) return;
+    const incoming = pendingImport.people;
+
+    if (mode === "replace") {
+      people = incoming;
+      save();
+      closeImportModal();
+      showPeopleView();
+      toast(`Replaced with ${incoming.length} ${incoming.length === 1 ? "person" : "people"}`);
+      return;
+    }
+
+    // Merge: add unseen people, and top up existing people with any
+    // conversations they don't already have. Local edits win on conflicts.
+    const byId = new Map(people.map((p) => [p.id, p]));
+    let addedPeople = 0;
+    let addedConvos = 0;
+
+    for (const person of incoming) {
+      const existing = byId.get(person.id);
+      if (!existing) {
+        people.push(person);
+        byId.set(person.id, person);
+        addedPeople++;
+        continue;
+      }
+      const seen = new Set(existing.conversations.map((c) => c.id));
+      for (const convo of person.conversations) {
+        if (!seen.has(convo.id)) {
+          existing.conversations.push(convo);
+          seen.add(convo.id);
+          addedConvos++;
+        }
+      }
+    }
+
+    save();
+    closeImportModal();
+    showPeopleView();
+
+    if (addedPeople === 0 && addedConvos === 0) {
+      toast("Nothing new to add — already up to date");
+    } else {
+      const bits = [];
+      if (addedPeople) bits.push(`${addedPeople} ${addedPeople === 1 ? "person" : "people"}`);
+      if (addedConvos) bits.push(`${addedConvos} conversation${addedConvos === 1 ? "" : "s"}`);
+      toast(`Added ${bits.join(" and ")}`);
+    }
+  }
+
+  function openAppSheet() {
+    document.getElementById("app-sheet-backdrop").hidden = false;
+  }
+  function closeAppSheet() {
+    document.getElementById("app-sheet-backdrop").hidden = true;
+  }
+
   // --------------------------------------------------------- options sheet
   function openPersonSheet() {
     const person = getPerson(currentPersonId);
@@ -607,6 +817,33 @@
     document.getElementById("suburb-filter").addEventListener("change", (e) => {
       filters.suburb = e.target.value;
       renderPeople();
+    });
+
+    // Backup menu
+    document.getElementById("app-menu-btn").addEventListener("click", openAppSheet);
+    document.getElementById("app-sheet-cancel").addEventListener("click", closeAppSheet);
+    document.getElementById("app-sheet-backdrop").addEventListener("click", (e) => {
+      if (e.target.id === "app-sheet-backdrop") closeAppSheet();
+    });
+    document.getElementById("sheet-export").addEventListener("click", () => {
+      closeAppSheet();
+      exportBackup();
+    });
+    document.getElementById("sheet-import").addEventListener("click", () => {
+      closeAppSheet();
+      document.getElementById("import-file-input").click();
+    });
+    document.getElementById("import-file-input").addEventListener("change", (e) => {
+      handleImportFile(e.target.files && e.target.files[0]);
+    });
+    document.getElementById("import-cancel-btn").addEventListener("click", closeImportModal);
+    document.getElementById("import-modal-backdrop").addEventListener("click", (e) => {
+      if (e.target.id === "import-modal-backdrop") closeImportModal();
+    });
+    document.getElementById("import-merge-btn").addEventListener("click", () => applyImport("merge"));
+    document.getElementById("import-replace-btn").addEventListener("click", () => {
+      if (people.length > 0 && !confirm("Delete everything currently in the app and replace it with this backup?")) return;
+      applyImport("replace");
     });
 
     document.getElementById("chip-row").addEventListener("click", (e) => {

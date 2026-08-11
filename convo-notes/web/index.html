@@ -30,6 +30,9 @@
           </span>
           Convo Notes
         </h1>
+        <button class="icon-btn" id="app-menu-btn" aria-label="Backup options">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>
+        </button>
         <button class="icon-btn" id="add-person-top-btn" aria-label="Add person">
           <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
         </button>
@@ -178,6 +181,34 @@
     <button class="sheet-action cancel" id="sheet-cancel">Cancel</button>
   </div>
 </div>
+
+<!-- ==================== SHEET: Backup options ==================== -->
+<div class="modal-backdrop" id="app-sheet-backdrop" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <button class="sheet-action" id="sheet-export">Export backup…</button>
+    <button class="sheet-action" id="sheet-import">Import backup…</button>
+    <button class="sheet-action cancel" id="app-sheet-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ==================== MODAL: Import backup ==================== -->
+<div class="modal-backdrop" id="import-modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+    <h2 id="import-modal-title">Import backup</h2>
+    <p class="import-summary" id="import-summary"></p>
+    <p class="modal-hint">
+      <strong>Merge</strong> keeps everything you already have and adds anything missing.
+      <strong>Replace</strong> deletes your current data first.
+    </p>
+    <div class="stack-actions">
+      <button class="btn btn-primary" id="import-merge-btn">Merge with my data</button>
+      <button class="btn btn-danger-outline" id="import-replace-btn">Replace everything</button>
+      <button class="btn btn-ghost" id="import-cancel-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="import-file-input" accept="application/json,.json" hidden />
 
 <div class="toast" id="toast" hidden></div>
 

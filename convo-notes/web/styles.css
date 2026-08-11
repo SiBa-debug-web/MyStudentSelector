@@ -367,6 +367,24 @@ button, input, select, textarea { font-family: inherit; }
 .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
 .modal-actions .btn { padding: 13px; font-size: 15px; }
 
+/* Import dialog: labels are too long to sit side by side. */
+.stack-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 18px; }
+.stack-actions .btn { padding: 13px; font-size: 15px; }
+.btn-danger-outline {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+.import-summary {
+  font-size: 14.5px;
+  line-height: 1.5;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 13px;
+  margin-bottom: 12px;
+}
+
 .sheet {
   width: 100%; max-width: 520px;
   background: var(--bg-elevated);
