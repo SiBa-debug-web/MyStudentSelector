@@ -1,4 +1,8 @@
-const CACHE_NAME = "convonotes-cache-v1";
+// Bump this whenever the app's assets change. A new value makes the browser
+// install a fresh worker, purge the previous cache in `activate`, and take
+// over immediately — so an installed home-screen copy picks the update up on
+// its next launch instead of serving stale files indefinitely.
+const CACHE_NAME = "convonotes-cache-v2";
 const ASSETS = [
   "./",
   "./index.html",
