@@ -14,6 +14,12 @@
   --warn: #fbbf24;
   --star: #fbbf24;
   --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  /* Tinted washes painted behind everything, plus a translucent topbar
+     so the colour carries up through the header. */
+  --wash-1: rgba(20, 184, 166, .40);
+  --wash-2: rgba(14, 165, 233, .34);
+  --wash-3: rgba(13, 148, 136, .26);
+  --topbar-bg: rgba(10, 17, 20, .62);
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -34,6 +40,10 @@
     --accent-2: #0284c7;
     --accent-soft: rgba(13, 148, 136, .12);
     --shadow: 0 10px 30px rgba(15, 40, 45, .10);
+    --wash-1: rgba(13, 148, 136, .42);
+    --wash-2: rgba(2, 132, 199, .34);
+    --wash-3: rgba(14, 165, 233, .26);
+    --topbar-bg: rgba(242, 246, 247, .62);
   }
 }
 
@@ -46,7 +56,17 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
-body { position: fixed; inset: 0; overflow: hidden; }
+body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  /* Fixed body, so these washes stay put while .content scrolls over them. */
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 620px at 10% -10%, var(--wash-1), transparent 62%),
+    radial-gradient(900px 560px at 105% 2%, var(--wash-2), transparent 58%),
+    radial-gradient(820px 700px at 45% 110%, var(--wash-3), transparent 60%);
+}
 h1, h2, p { margin: 0; }
 button, input, select, textarea { font-family: inherit; }
 
@@ -67,7 +87,9 @@ button, input, select, textarea { font-family: inherit; }
 /* ---------- Topbar ---------- */
 .topbar {
   padding: calc(var(--safe-top) + 12px) 16px 10px;
-  background: var(--bg);
+  background: var(--topbar-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
