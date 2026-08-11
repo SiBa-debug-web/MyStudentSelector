@@ -10,6 +10,7 @@
 		ABD0968031EC2A82C5F49231 /* ConvoNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DAB1328FCCCB6431D4A99F /* ConvoNotesApp.swift */; };
 		D2D588CA162CE37B07F89FAA /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24B73244D99631C1C6F73EDE /* Conversation.swift */; };
 		BAEF80C8D0BB479D9551AD57 /* Person.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD400554E84F3186535A3562 /* Person.swift */; };
+		61ED58D30A0819515E968E8B /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E4573F6B5BA0B00EB80DF6 /* Backup.swift */; };
 		28615622766C656626D7D0DB /* PersonStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C5CD18A270A9686327189A /* PersonStore.swift */; };
 		4FACD173383385E9D069EB13 /* ReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C159559C33AEB5D7F61F78A3 /* ReminderScheduler.swift */; };
 		0E0F114675CCCDF803C04721 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF4BE1196CC2C44DC51A1A9 /* Theme.swift */; };
@@ -25,6 +26,7 @@
 		57DAB1328FCCCB6431D4A99F /* ConvoNotesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoNotesApp.swift; sourceTree = "<group>"; };
 		24B73244D99631C1C6F73EDE /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		BD400554E84F3186535A3562 /* Person.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Person.swift; sourceTree = "<group>"; };
+		93E4573F6B5BA0B00EB80DF6 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		49C5CD18A270A9686327189A /* PersonStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonStore.swift; sourceTree = "<group>"; };
 		C159559C33AEB5D7F61F78A3 /* ReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderScheduler.swift; sourceTree = "<group>"; };
 		FBF4BE1196CC2C44DC51A1A9 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -80,6 +82,7 @@
 		A81966171DE8F0A702D190EA /* Store */ = {
 			isa = PBXGroup;
 			children = (
+				93E4573F6B5BA0B00EB80DF6 /* Backup.swift */,
 				49C5CD18A270A9686327189A /* PersonStore.swift */,
 				C159559C33AEB5D7F61F78A3 /* ReminderScheduler.swift */,
 			);
@@ -179,6 +182,7 @@
 				ABD0968031EC2A82C5F49231 /* ConvoNotesApp.swift in Sources */,
 				D2D588CA162CE37B07F89FAA /* Conversation.swift in Sources */,
 				BAEF80C8D0BB479D9551AD57 /* Person.swift in Sources */,
+				61ED58D30A0819515E968E8B /* Backup.swift in Sources */,
 				28615622766C656626D7D0DB /* PersonStore.swift in Sources */,
 				4FACD173383385E9D069EB13 /* ReminderScheduler.swift in Sources */,
 				0E0F114675CCCDF803C04721 /* Theme.swift in Sources */,

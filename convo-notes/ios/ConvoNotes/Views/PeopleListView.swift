@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum PeopleScope: String, CaseIterable, Identifiable {
     case active
@@ -26,6 +27,14 @@ struct PeopleListView: View {
     @State private var scope: PeopleScope = .active
     @State private var suburbFilter: String? = nil
     @State private var showAddPerson = false
+
+    // Backup
+    @State private var showExporter = false
+    @State private var exportDocument = BackupDocument(data: Data())
+    @State private var showImporter = false
+    @State private var pendingImport: [Person] = []
+    @State private var showImportChoice = false
+    @State private var backupMessage: String?
 
     private var filteredPeople: [Person] {
         let query = search.trimmingCharacters(in: .whitespaces).lowercased()
@@ -122,6 +131,23 @@ struct PeopleListView: View {
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button {
+                        startExport()
+                    } label: {
+                        Label("Export backup…", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Label("Import backup…", systemImage: "square.and.arrow.down")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel("Backup options")
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showAddPerson = true
                 } label: {
@@ -137,6 +163,98 @@ struct PeopleListView: View {
                 let person = store.addPerson(name: name, category: category, suburb: suburb)
                 selection = person.id
             }
+        }
+        .fileExporter(
+            isPresented: $showExporter,
+            document: exportDocument,
+            contentType: .json,
+            defaultFilename: BackupCoder.filename()
+        ) { result in
+            if case .failure = result {
+                backupMessage = "Couldn't save the backup."
+            }
+        }
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first { loadBackup(from: url) }
+            case .failure:
+                backupMessage = "Couldn't open that file."
+            }
+        }
+        .confirmationDialog("Import backup", isPresented: $showImportChoice, titleVisibility: .visible) {
+            Button("Merge with my data") {
+                let added = store.merge(pendingImport)
+                pendingImport = []
+                backupMessage = (added.people == 0 && added.conversations == 0)
+                    ? "Nothing new to add — already up to date."
+                    : "Added \(added.people) \(added.people == 1 ? "person" : "people") and "
+                      + "\(added.conversations) conversation\(added.conversations == 1 ? "" : "s")."
+            }
+            Button("Replace everything", role: .destructive) {
+                let count = pendingImport.count
+                store.replaceAll(with: pendingImport)
+                pendingImport = []
+                selection = nil
+                backupMessage = "Replaced with \(count) \(count == 1 ? "person" : "people") from the backup."
+            }
+            Button("Cancel", role: .cancel) { pendingImport = [] }
+        } message: {
+            Text(importSummary)
+        }
+        .alert(
+            "Backup",
+            isPresented: Binding(
+                get: { backupMessage != nil },
+                set: { if !$0 { backupMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(backupMessage ?? "")
+        }
+    }
+
+    // MARK: - Backup
+
+    private var importSummary: String {
+        let convos = pendingImport.reduce(0) { $0 + $1.conversations.count }
+        return "This backup holds \(pendingImport.count) "
+            + "\(pendingImport.count == 1 ? "person" : "people") and "
+            + "\(convos) conversation\(convos == 1 ? "" : "s"). "
+            + "Merge keeps what you already have and adds anything missing. "
+            + "Replace deletes your current data first."
+    }
+
+    private func startExport() {
+        do {
+            exportDocument = BackupDocument(data: try store.exportData())
+            showExporter = true
+        } catch {
+            backupMessage = "Couldn't prepare the backup."
+        }
+    }
+
+    private func loadBackup(from url: URL) {
+        // Files hands back a security-scoped URL; without this the read fails.
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let imported = try BackupCoder.decodePeople(from: data)
+            guard !imported.isEmpty else {
+                backupMessage = "That backup has no people in it."
+                return
+            }
+            pendingImport = imported
+            showImportChoice = true
+        } catch {
+            backupMessage = "That file isn't a Convo Notes backup."
         }
     }
 

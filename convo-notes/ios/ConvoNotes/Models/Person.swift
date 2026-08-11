@@ -29,6 +29,60 @@ struct Person: Identifiable, Codable, Hashable {
     var createdAt: Date = Date()
     var conversations: [Conversation] = []
 
+    // As with Conversation: only `name` is required, everything else falls
+    // back to a default, and the web build's key names are accepted so its
+    // backups import cleanly.
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, suburb, isShortlisted, isArchived, createdAt, conversations
+        case shortlisted, archived
+    }
+
+    init(id: UUID = UUID(), name: String, category: PersonCategory = .man,
+         suburb: String = "", isShortlisted: Bool = false, isArchived: Bool = false,
+         createdAt: Date = Date(), conversations: [Conversation] = []) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.suburb = suburb
+        self.isShortlisted = isShortlisted
+        self.isArchived = isArchived
+        self.createdAt = createdAt
+        self.conversations = conversations
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let raw = try? c.decode(String.self, forKey: .id) {
+            id = BackupCoder.stableUUID(from: raw)
+        } else {
+            id = UUID()
+        }
+        name = try c.decode(String.self, forKey: .name)
+        let rawCategory = (try? c.decode(String.self, forKey: .category)) ?? ""
+        category = PersonCategory(rawValue: rawCategory) ?? .man
+        suburb = (try? c.decode(String.self, forKey: .suburb)) ?? ""
+        isShortlisted = (try? c.decode(Bool.self, forKey: .isShortlisted))
+            ?? (try? c.decode(Bool.self, forKey: .shortlisted))
+            ?? false
+        isArchived = (try? c.decode(Bool.self, forKey: .isArchived))
+            ?? (try? c.decode(Bool.self, forKey: .archived))
+            ?? false
+        createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? Date()
+        conversations = (try? c.decode([Conversation].self, forKey: .conversations)) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(category, forKey: .category)
+        try c.encode(suburb, forKey: .suburb)
+        try c.encode(isShortlisted, forKey: .isShortlisted)
+        try c.encode(isArchived, forKey: .isArchived)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(conversations, forKey: .conversations)
+    }
+
     /// Most recent conversation, falling back to when the person was added.
     var lastActivity: Date {
         conversations.map(\.date).max() ?? createdAt

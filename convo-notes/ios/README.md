@@ -16,6 +16,21 @@ To run on your own device: plug it in, select it as the destination, then under 
 
 On first launch the app asks permission to send notifications. If you decline, everything still works — you just lose the push reminders and keep the in-app "Follow-up" filter.
 
+## Backups
+
+The **⋯** menu in the people list has **Export backup** and **Import backup**.
+
+Export writes a `convo-notes-backup-YYYY-MM-DD.json` through the system save
+sheet, so it can go to Files or iCloud Drive. Import reads one back and asks
+whether to **merge** (adds anything missing, keeps what you have, matching on
+id so re-importing the same file changes nothing) or **replace**.
+
+Backups are interchangeable with the web build in `../web`: the decoder accepts
+that format's key names (`at`, `shortlisted`, `archived`), its lowercase
+`followup` kind, its millisecond timestamps, and its non-UUID ids — which are
+hashed to fixed UUIDs so identity stays stable across repeated imports. So you
+can export from the web app and import here to bring existing notes over.
+
 ## Layout
 
 On iPhone it's a normal push-navigation list. On iPad it's a two-column split view: people on the left, the selected person's conversation history on the right.
