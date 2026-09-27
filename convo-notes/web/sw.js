@@ -2,13 +2,18 @@
 // install a fresh worker, purge the previous cache in `activate`, and take
 // over immediately — so an installed home-screen copy picks the update up on
 // its next launch instead of serving stale files indefinitely.
-const CACHE_NAME = "convonotes-cache-v3";
+const CACHE_NAME = "convonotes-cache-v4";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.json",
+  "./vendor/leaflet/leaflet.js",
+  "./vendor/leaflet/leaflet.css",
+  "./vendor/leaflet/images/marker-icon.png",
+  "./vendor/leaflet/images/marker-icon-2x.png",
+  "./vendor/leaflet/images/marker-shadow.png",
   "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -31,6 +36,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Only handle our own files. Map tiles and address lookups are cross-origin
+  // and go straight to the network — caching tiles here would grow without
+  // bound, and cached geocoder replies would go stale.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)

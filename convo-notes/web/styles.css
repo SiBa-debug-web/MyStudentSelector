@@ -310,6 +310,110 @@ button, input, select, textarea { font-family: inherit; }
 .btn-ghost { background: transparent; color: var(--text-secondary); font-weight: 600; font-size: 15px; }
 .empty-state .btn { max-width: 300px; margin: 0 auto; }
 
+/* ---------- Address + map ---------- */
+.person-address-row[hidden] { display: none; }
+.person-address-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+.addr-pin { flex-shrink: 0; }
+.addr-text { flex: 1; min-width: 120px; word-break: break-word; }
+.addr-text.addr-warn { color: var(--warn); }
+.addr-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.addr-actions .link-btn { text-decoration: none; }
+.addr-actions .link-btn[hidden] { display: none; }
+
+.field-optional {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-tertiary);
+}
+
+.addr-lookup-row { display: flex; gap: 8px; align-items: center; }
+.addr-lookup-row .btn { width: auto; flex: 1; padding: 11px 14px; font-size: 14.5px; }
+.btn-secondary {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.btn-secondary:disabled { opacity: .6; }
+.addr-clear-btn { flex: 0 0 auto !important; }
+.addr-clear-btn[hidden] { display: none; }
+
+.lookup-status[hidden] { display: none; }
+.lookup-status {
+  font-size: 12.5px;
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.lookup-status.ok { color: var(--accent); }
+.lookup-status.warn { color: var(--warn); }
+
+.pin-preview[hidden] { display: none; }
+.pin-preview { margin-top: 10px; }
+#pin-map {
+  height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.pin-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 6px 0 0;
+  text-align: center;
+}
+
+.map-summary {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.map-wrap { flex: 1; position: relative; min-height: 0; }
+#map { position: absolute; inset: 0; background: var(--bg-elevated); }
+.map-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 500;
+}
+.map-empty[hidden] { display: none; }
+
+/* Map pins mirror the avatar colours so the map reads like the list. */
+.pin-marker-wrap { background: none; border: none; }
+.pin-marker {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 12px; font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  border: 2px solid #fff;
+  background: linear-gradient(150deg, var(--accent), var(--accent-2));
+}
+.pin-marker.cat-child { background: linear-gradient(150deg, #f59e0b, #f97316); }
+.pin-marker.cat-woman { background: linear-gradient(150deg, #8b5cf6, #d946ef); }
+.pin-marker.is-overdue { border-color: var(--warn); }
+.pin-marker.is-archived { opacity: .55; }
+
+.map-popup { min-width: 170px; }
+.map-popup-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; color: #16161f; }
+.map-popup-meta { font-size: 12.5px; color: #5d7378; margin-bottom: 2px; }
+.map-popup .btn { margin-top: 9px; padding: 9px; font-size: 14px; }
+.leaflet-popup-content { margin: 12px 14px; }
+
 /* ---------- Modals ---------- */
 .modal-backdrop[hidden] { display: none; }
 .modal-backdrop {

@@ -5,13 +5,20 @@
   const FOLLOW_UP_DAYS = 30;
   const DAY_MS = 24 * 60 * 60 * 1000;
 
+  // OpenStreetMap's geocoder: free, no API key. Only the address text is ever
+  // sent — never names, notes or anything else about a person.
+  const GEOCODE_URL = "https://nominatim.openstreetmap.org/search";
+  const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+  const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
   const CATEGORY_LABELS = { man: "Man", woman: "Woman", child: "Child" };
 
   /**
    * @typedef {{id:string, at:string, kind:"initial"|"followup", location:string, notes:string}} Conversation
    * @typedef {{id:string, name:string, category:"man"|"woman"|"child", suburb:string,
    *            shortlisted:boolean, archived:boolean, createdAt:string,
-   *            conversations:Conversation[]}} Person
+   *            address?:string, lat?:number, lng?:number, geocodedFrom?:string,
+   *            pinAdjusted?:boolean, conversations:Conversation[]}} Person
    */
 
   /** @type {Person[]} */
@@ -23,6 +30,18 @@
   // Modal editing state
   let personModalEditingId = null;
   let personModalCategory = "man";
+  // Working copy of the pin while the person modal is open; only committed on
+  // save, so cancelling never moves someone's pin.
+  let personModalPin = { lat: null, lng: null, from: "", adjusted: false };
+  let pinMap = null;
+  let pinMarker = null;
+  let geocodeInFlight = false;
+
+  // Map view
+  let mainMap = null;
+  let mainMarkers = null;
+  let pendingMapFocusId = null;
+
   let convoModalEditingId = null;
   let convoModalKind = "initial";
   // The datetime-local value we pre-filled, so we can tell whether the user
@@ -141,6 +160,7 @@
   function showPeopleView() {
     currentPersonId = null;
     document.getElementById("view-person").hidden = true;
+    document.getElementById("view-map").hidden = true;
     document.getElementById("view-people").hidden = false;
     renderPeople();
   }
@@ -149,6 +169,7 @@
     if (!getPerson(id)) return showPeopleView();
     currentPersonId = id;
     document.getElementById("view-people").hidden = true;
+    document.getElementById("view-map").hidden = true;
     document.getElementById("view-person").hidden = false;
     renderPerson();
     if (!opts.skipHistory) {
@@ -156,10 +177,23 @@
     }
   }
 
+  function showMapView(opts = {}) {
+    pendingMapFocusId = opts.focusId || null;
+    document.getElementById("view-people").hidden = true;
+    document.getElementById("view-person").hidden = true;
+    document.getElementById("view-map").hidden = false;
+    renderMap();
+    if (!opts.skipHistory) {
+      history.pushState({ map: true }, "", "#map");
+    }
+  }
+
   window.addEventListener("popstate", (e) => {
-    const pid = e.state && e.state.personId;
-    if (pid && getPerson(pid)) showPersonView(pid, { skipHistory: true });
-    else showPeopleView();
+    const state = e.state || {};
+    if (state.map) showMapView({ skipHistory: true });
+    else if (state.personId && getPerson(state.personId)) {
+      showPersonView(state.personId, { skipHistory: true });
+    } else showPeopleView();
   });
 
   // ------------------------------------------------------- render: people
@@ -268,16 +302,21 @@
     }
   }
 
+  /** "3 conversations · last 5 days ago", shared by the list and the map popup. */
+  function activitySummary(person) {
+    const count = person.conversations.length;
+    const gap = describeGap(daysSinceActivity(person));
+    return count === 0
+      ? `No conversations yet · added ${gap}`
+      : `${count} conversation${count === 1 ? "" : "s"} · last ${gap}`;
+  }
+
   function renderPersonRow(person) {
     const li = document.createElement("li");
     li.className = "person-row" + (person.archived ? " is-archived" : "");
 
-    const count = person.conversations.length;
     const overdue = isOverdue(person);
-    const gap = describeGap(daysSinceActivity(person));
-    const sub = count === 0
-      ? `No conversations yet · added ${gap}`
-      : `${count} conversation${count === 1 ? "" : "s"} · last ${gap}`;
+    const sub = activitySummary(person);
 
     const tags = [];
     if (overdue) tags.push('<span class="tag tag-overdue">Follow up</span>');
@@ -335,6 +374,8 @@
     const count = person.conversations.length;
     document.getElementById("convo-count").textContent = count > 0 ? `(${count})` : "";
 
+    renderAddressRow(person);
+
     const listEl = document.getElementById("convo-list");
     const emptyEl = document.getElementById("convos-empty");
     listEl.innerHTML = "";
@@ -353,6 +394,28 @@
     for (const convo of sorted) {
       listEl.appendChild(renderConvoItem(person, convo));
     }
+  }
+
+  function renderAddressRow(person) {
+    const row = document.getElementById("person-address-row");
+    const address = (person.address || "").trim();
+
+    if (!address) {
+      row.hidden = true;
+      return;
+    }
+
+    row.hidden = false;
+    const text = document.getElementById("person-address-text");
+    if (hasPin(person)) {
+      text.textContent = pinIsStale(person) ? address + " (pin out of date)" : address;
+    } else {
+      text.textContent = address + " (not pinned)";
+    }
+    text.classList.toggle("addr-warn", !hasPin(person) || pinIsStale(person));
+
+    document.getElementById("person-map-link").hidden = !hasPin(person);
+    document.getElementById("person-directions-link").href = directionsURL(person);
   }
 
   function renderConvoItem(person, convo) {
@@ -393,6 +456,151 @@
     return li;
   }
 
+  // --------------------------------------------------------------- geocoding
+  function hasPin(person) {
+    return typeof person.lat === "number" && typeof person.lng === "number";
+  }
+
+  /** True when the address was edited after the pin was placed. */
+  function pinIsStale(person) {
+    if (!hasPin(person)) return false;
+    const address = (person.address || "").trim();
+    return address !== "" && address !== (person.geocodedFrom || "");
+  }
+
+  /** Build the query, folding in the suburb when it isn't already mentioned. */
+  function geocodeQuery(address, suburb) {
+    const parts = [address.trim()];
+    const sub = (suburb || "").trim();
+    if (sub && !address.toLowerCase().includes(sub.toLowerCase())) parts.push(sub);
+    return parts.filter(Boolean).join(", ");
+  }
+
+  async function geocode(address, suburb) {
+    const query = geocodeQuery(address, suburb);
+    if (!query) return null;
+    const url = `${GEOCODE_URL}?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Lookup failed (${response.status})`);
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) return null;
+    const hit = results[0];
+    const lat = parseFloat(hit.lat);
+    const lng = parseFloat(hit.lon);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return { lat, lng, label: hit.display_name || query };
+  }
+
+  function directionsURL(person) {
+    if (hasPin(person)) {
+      return `https://maps.apple.com/?q=${encodeURIComponent(person.name)}&ll=${person.lat},${person.lng}`;
+    }
+    return `https://maps.apple.com/?q=${encodeURIComponent(geocodeQuery(person.address || "", person.suburb))}`;
+  }
+
+  // ------------------------------------------------------------- map markers
+  /** Marker styled like the person's avatar, so the map reads like the list. */
+  function personMarkerIcon(person) {
+    const classes = [
+      "pin-marker",
+      "cat-" + person.category,
+      isOverdue(person) ? "is-overdue" : "",
+      person.archived ? "is-archived" : "",
+    ].filter(Boolean).join(" ");
+    return L.divIcon({
+      className: "pin-marker-wrap",
+      html: `<span class="${classes}">${escapeHtml(initialsOf(person.name))}</span>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor: [0, -16],
+    });
+  }
+
+  function tileLayer() {
+    return L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 });
+  }
+
+  // ---------------------------------------------------------- render: map
+  function mappablePeople() {
+    return visiblePeople().filter(hasPin);
+  }
+
+  function scopeLabel() {
+    const labels = {
+      active: "Active",
+      shortlist: "Shortlist",
+      overdue: "Needs follow-up",
+      archived: "Archived",
+    };
+    const bits = [labels[filters.scope]];
+    if (filters.suburb !== "all") bits.push(filters.suburb);
+    if (filters.search.trim()) bits.push(`“${filters.search.trim()}”`);
+    return bits.join(" · ");
+  }
+
+  function renderMap() {
+    const list = mappablePeople();
+    const withoutPins = visiblePeople().length - list.length;
+
+    const summary = document.getElementById("map-summary");
+    const parts = [`${list.length} pin${list.length === 1 ? "" : "s"} · ${scopeLabel()}`];
+    if (withoutPins > 0) parts.push(`${withoutPins} without an address`);
+    summary.textContent = parts.join(" · ");
+
+    document.getElementById("map-empty").hidden = list.length > 0;
+
+    if (!mainMap) {
+      mainMap = L.map("map", { zoomControl: true }).setView([-37.8136, 144.9631], 12);
+      tileLayer().addTo(mainMap);
+      mainMarkers = L.layerGroup().addTo(mainMap);
+    }
+    mainMarkers.clearLayers();
+
+    const bounds = [];
+    for (const person of list) {
+      const marker = L.marker([person.lat, person.lng], { icon: personMarkerIcon(person) });
+      marker.bindPopup(popupHTML(person));
+      marker.on("popupopen", (e) => {
+        const btn = e.popup.getElement().querySelector(".popup-open-btn");
+        if (btn) btn.addEventListener("click", () => showPersonView(person.id));
+      });
+      marker.addTo(mainMarkers);
+      bounds.push([person.lat, person.lng]);
+    }
+
+    // Leaflet measures the container on creation, and it was hidden then.
+    setTimeout(() => {
+      if (!mainMap) return;
+      mainMap.invalidateSize();
+      const focus = pendingMapFocusId ? getPerson(pendingMapFocusId) : null;
+      if (focus && hasPin(focus)) {
+        mainMap.setView([focus.lat, focus.lng], 17);
+        pendingMapFocusId = null;
+      } else if (bounds.length === 1) {
+        mainMap.setView(bounds[0], 16);
+      } else if (bounds.length > 1) {
+        mainMap.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }, 60);
+  }
+
+  function popupHTML(person) {
+    const meta = [CATEGORY_LABELS[person.category] || ""];
+    if (person.suburb) meta.push(person.suburb);
+    const tags = [];
+    if (isOverdue(person)) tags.push('<span class="tag tag-overdue">Follow up</span>');
+    if (person.archived) tags.push('<span class="tag tag-archived">Archived</span>');
+    return `
+      <div class="map-popup">
+        <div class="map-popup-name">${escapeHtml(person.name)} ${tags.join("")}</div>
+        <div class="map-popup-meta">${escapeHtml(meta.filter(Boolean).join(" · "))}</div>
+        ${person.address ? `<div class="map-popup-meta">${escapeHtml(person.address)}</div>` : ""}
+        <div class="map-popup-meta">${escapeHtml(activitySummary(person))}</div>
+        <button class="btn btn-primary popup-open-btn">Open</button>
+      </div>
+    `;
+  }
+
   // --------------------------------------------------------- person modal
   function setSegmented(containerId, value) {
     const container = document.getElementById(containerId);
@@ -408,8 +616,20 @@
     document.getElementById("person-modal-title").textContent = person ? "Edit person" : "Add person";
     document.getElementById("person-name-input").value = person ? person.name : "";
     document.getElementById("person-suburb-input").value = person ? person.suburb : "";
+    document.getElementById("person-address-input").value = person ? (person.address || "") : "";
     personModalCategory = person ? person.category : "man";
     setSegmented("person-category-seg", personModalCategory);
+
+    personModalPin = person && hasPin(person)
+      ? { lat: person.lat, lng: person.lng, from: person.geocodedFrom || "", adjusted: !!person.pinAdjusted }
+      : { lat: null, lng: null, from: "", adjusted: false };
+
+    setLookupStatus(
+      person && pinIsStale(person)
+        ? { text: "The address changed since this pin was placed — look it up again.", tone: "warn" }
+        : null
+    );
+    renderPinPreview();
 
     document.getElementById("person-modal-backdrop").hidden = false;
     setTimeout(() => document.getElementById("person-name-input").focus(), 60);
@@ -417,15 +637,126 @@
 
   function closePersonModal() {
     document.getElementById("person-modal-backdrop").hidden = true;
+    destroyPinMap();
+  }
+
+  function setLookupStatus(status) {
+    const el = document.getElementById("lookup-status");
+    if (!status) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = status.text;
+    el.className = "lookup-status " + (status.tone || "");
+  }
+
+  function destroyPinMap() {
+    if (pinMap) {
+      pinMap.remove();
+      pinMap = null;
+      pinMarker = null;
+    }
+  }
+
+  /** Shows (or hides) the little draggable-pin map under the address field. */
+  function renderPinPreview() {
+    const wrap = document.getElementById("pin-preview");
+    const clearBtn = document.getElementById("person-clear-pin-btn");
+
+    if (personModalPin.lat === null || personModalPin.lng === null) {
+      wrap.hidden = true;
+      clearBtn.hidden = true;
+      destroyPinMap();
+      return;
+    }
+
+    wrap.hidden = false;
+    clearBtn.hidden = false;
+    const position = [personModalPin.lat, personModalPin.lng];
+
+    if (!pinMap) {
+      pinMap = L.map("pin-map", { attributionControl: false, zoomControl: false })
+        .setView(position, 16);
+      tileLayer().addTo(pinMap);
+      pinMarker = L.marker(position, { draggable: true }).addTo(pinMap);
+      pinMarker.on("dragend", () => {
+        const pos = pinMarker.getLatLng();
+        personModalPin.lat = pos.lat;
+        personModalPin.lng = pos.lng;
+        personModalPin.adjusted = true;
+        setLookupStatus({ text: "Pin moved — it'll save where you put it.", tone: "ok" });
+      });
+    } else {
+      pinMap.setView(position, pinMap.getZoom() || 16);
+      pinMarker.setLatLng(position);
+    }
+
+    // The container was display:none a moment ago, so Leaflet has stale
+    // dimensions until it re-measures.
+    setTimeout(() => { if (pinMap) pinMap.invalidateSize(); }, 50);
+  }
+
+  async function runGeocode() {
+    if (geocodeInFlight) return;
+    const address = document.getElementById("person-address-input").value.trim();
+    const suburb = document.getElementById("person-suburb-input").value.trim();
+    if (!address) {
+      setLookupStatus({ text: "Type an address first.", tone: "warn" });
+      return;
+    }
+
+    geocodeInFlight = true;
+    const button = document.getElementById("person-geocode-btn");
+    button.disabled = true;
+    setLookupStatus({ text: "Looking up address…", tone: "" });
+
+    try {
+      const hit = await geocode(address, suburb);
+      if (!hit) {
+        setLookupStatus({
+          text: "Couldn't find that address. Try adding the suburb, or save without a pin.",
+          tone: "warn",
+        });
+      } else {
+        personModalPin = { lat: hit.lat, lng: hit.lng, from: address, adjusted: false };
+        setLookupStatus({ text: "Found: " + hit.label, tone: "ok" });
+        renderPinPreview();
+      }
+    } catch (e) {
+      setLookupStatus({
+        text: "Lookup failed — you may be offline. You can still save the address as text.",
+        tone: "warn",
+      });
+    } finally {
+      geocodeInFlight = false;
+      button.disabled = false;
+    }
+  }
+
+  function clearPin() {
+    personModalPin = { lat: null, lng: null, from: "", adjusted: false };
+    renderPinPreview();
+    setLookupStatus({ text: "Pin removed.", tone: "" });
   }
 
   function savePersonModal() {
     const name = document.getElementById("person-name-input").value.trim();
     const suburb = document.getElementById("person-suburb-input").value.trim();
+    const address = document.getElementById("person-address-input").value.trim();
     if (!name) {
       toast("Please enter a name");
       return;
     }
+
+    const pinFields = {
+      address,
+      lat: personModalPin.lat,
+      lng: personModalPin.lng,
+      geocodedFrom: personModalPin.from,
+      pinAdjusted: personModalPin.adjusted,
+    };
 
     if (personModalEditingId) {
       const person = getPerson(personModalEditingId);
@@ -433,6 +764,7 @@
         person.name = name;
         person.suburb = suburb;
         person.category = personModalCategory;
+        Object.assign(person, pinFields);
       }
       save();
       closePersonModal();
@@ -448,6 +780,7 @@
         archived: false,
         createdAt: new Date().toISOString(),
         conversations: [],
+        ...pinFields,
       };
       people.push(person);
       save();
@@ -879,6 +1212,25 @@
     document.getElementById("person-name-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") savePersonModal();
     });
+    document.getElementById("person-geocode-btn").addEventListener("click", runGeocode);
+    document.getElementById("person-clear-pin-btn").addEventListener("click", clearPin);
+    document.getElementById("person-address-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runGeocode();
+      }
+    });
+
+    // Map
+    document.getElementById("open-map-btn").addEventListener("click", () => showMapView());
+    document.getElementById("map-back-btn").addEventListener("click", () => history.back());
+    document.getElementById("map-fit-btn").addEventListener("click", () => {
+      pendingMapFocusId = null;
+      renderMap();
+    });
+    document.getElementById("person-map-link").addEventListener("click", () => {
+      showMapView({ focusId: currentPersonId });
+    });
 
     // Conversation modal
     document.getElementById("convo-modal-cancel").addEventListener("click", closeConvoModal);
@@ -917,7 +1269,10 @@
 
     // Routing
     const match = location.hash.match(/^#person=(.+)$/);
-    if (match && getPerson(match[1])) {
+    if (location.hash === "#map") {
+      history.replaceState({ map: true }, "", "#map");
+      showMapView({ skipHistory: true });
+    } else if (match && getPerson(match[1])) {
       history.replaceState({ personId: match[1] }, "", location.hash);
       showPersonView(match[1], { skipHistory: true });
     } else {

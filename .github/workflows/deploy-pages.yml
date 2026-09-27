@@ -49,6 +49,7 @@ jobs:
              convo-notes/web/manifest.json \
              convo-notes/web/sw.js _site/convo-notes/
           cp -r convo-notes/web/icons _site/convo-notes/icons
+          cp -r convo-notes/web/vendor _site/convo-notes/vendor
 
           echo "Staged files:"
           find _site -type f | sort
